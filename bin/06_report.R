@@ -30,25 +30,25 @@ parse_args <- function(args) {
     fc_cutoff          = 1.0,
     output             = "proteomics_report.html"
   )
-
+  
   i <- 1
   while (i <= length(args)) {
     switch(args[i],
-      "--qc-summary"         = { defaults$qc_summary         <- args[i+1]; i <- i+2 },
-      "--boxplot"            = { defaults$boxplot             <- args[i+1]; i <- i+2 },
-      "--pca-plot"           = { defaults$pca_plot           <- args[i+1]; i <- i+2 },
-      "--da-results"         = { defaults$da_results         <- args[i+1]; i <- i+2 },
-      "--enrichment-results" = { defaults$enrichment_results <- args[i+1]; i <- i+2 },
-      "--sample-sheet"       = { defaults$sample_sheet       <- args[i+1]; i <- i+2 },
-      "--condition-a"        = { defaults$condition_a        <- args[i+1]; i <- i+2 },
-      "--condition-b"        = { defaults$condition_b        <- args[i+1]; i <- i+2 },
-      "--fdr-cutoff"         = { defaults$fdr_cutoff         <- as.numeric(args[i+1]); i <- i+2 },
-      "--fc-cutoff"          = { defaults$fc_cutoff          <- as.numeric(args[i+1]); i <- i+2 },
-      "--output"             = { defaults$output             <- args[i+1]; i <- i+2 },
-      { stop(sprintf("Unknown argument: %s", args[i])) }
+           "--qc-summary"         = { defaults$qc_summary         <- args[i+1]; i <- i+2 },
+           "--boxplot"            = { defaults$boxplot             <- args[i+1]; i <- i+2 },
+           "--pca-plot"           = { defaults$pca_plot           <- args[i+1]; i <- i+2 },
+           "--da-results"         = { defaults$da_results         <- args[i+1]; i <- i+2 },
+           "--enrichment-results" = { defaults$enrichment_results <- args[i+1]; i <- i+2 },
+           "--sample-sheet"       = { defaults$sample_sheet       <- args[i+1]; i <- i+2 },
+           "--condition-a"        = { defaults$condition_a        <- args[i+1]; i <- i+2 },
+           "--condition-b"        = { defaults$condition_b        <- args[i+1]; i <- i+2 },
+           "--fdr-cutoff"         = { defaults$fdr_cutoff         <- as.numeric(args[i+1]); i <- i+2 },
+           "--fc-cutoff"          = { defaults$fc_cutoff          <- as.numeric(args[i+1]); i <- i+2 },
+           "--output"             = { defaults$output             <- args[i+1]; i <- i+2 },
+           { stop(sprintf("Unknown argument: %s", args[i])) }
     )
   }
-
+  
   for (req in c("qc_summary", "da_results", "sample_sheet")) {
     if (is.null(defaults[[req]])) {
       stop(sprintf("--%s is required", gsub("_", "-", req)))
@@ -86,7 +86,8 @@ params:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      out.width = "100%")
 library(data.table)
 library(knitr)
 library(kableExtra)
@@ -128,7 +129,7 @@ cat(paste(qc_lines, collapse = "\n"))
 
 ## 3. Normalization
 
-```{r boxplot, fig.cap="Protein intensity distributions before and after normalization.", out.width="100%"}
+```{r boxplot, fig.cap="Protein intensity distributions before and after normalization."}
 knitr::include_graphics(params$boxplot_path)
 ```
 
@@ -139,7 +140,7 @@ knitr::include_graphics(params$boxplot_path)
 PCA provides a global view of sample similarity. Samples from the same condition
 should cluster together. Outliers or batch effects become visible here.
 
-```{r pca-plot, fig.cap="PCA of normalized protein intensities. Each point is one sample.", out.width="80%"}
+```{r pca-plot, fig.cap="PCA of normalized protein intensities. Each point is one sample."}
 if (nchar(params$pca_plot_path) > 0 && file.exists(params$pca_plot_path)) {
   knitr::include_graphics(params$pca_plot_path)
 } else {
@@ -293,11 +294,11 @@ rmarkdown::render(
     qc_summary         = file.path(wd, opt$qc_summary),
     boxplot_path       = file.path(wd, opt$boxplot),
     pca_plot_path      = if (!is.null(opt$pca_plot) && nchar(opt$pca_plot) > 0)
-                           file.path(wd, opt$pca_plot) else "",
+      file.path(wd, opt$pca_plot) else "",
     da_results         = file.path(wd, opt$da_results),
     enrichment_results = if (!is.null(opt$enrichment_results) &&
                              nchar(opt$enrichment_results) > 0)
-                           file.path(wd, opt$enrichment_results) else "",
+      file.path(wd, opt$enrichment_results) else "",
     sample_sheet       = file.path(wd, opt$sample_sheet),
     condition_a        = if (!is.null(opt$condition_a)) opt$condition_a else "",
     condition_b        = if (!is.null(opt$condition_b)) opt$condition_b else "",
