@@ -1,0 +1,18 @@
+name: proteomicsda
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - nextflow>=23.04.0
+  - r-base>=4.2.0
+  - r-data.table
+  - r-ggplot2
+  - r-ggrepel
+  - r-rmarkdown
+  - r-knitr
+  - r-kableextra
+  - bioconductor-limma
+  - bioconductor-deqms
+  - wget
+  - r-bit64
