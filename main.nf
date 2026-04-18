@@ -100,7 +100,7 @@ process NORMALIZE {
 
     output:
     path "normalized_matrix.tsv",     emit: normalized_matrix
-    path "normalization_boxplot.pdf",  emit: boxplot
+    path "normalization_boxplot.png",  emit: boxplot
 
     script:
     """
@@ -108,7 +108,7 @@ process NORMALIZE {
         --input         ${filtered_matrix} \\
         --sample-sheet  ${sample_sheet} \\
         --output        normalized_matrix.tsv \\
-        --boxplot       normalization_boxplot.pdf
+        --boxplot       normalization_boxplot.png
     """
 }
 
@@ -126,7 +126,7 @@ process PCA {
     path sample_sheet
 
     output:
-    path "pca_plot.pdf",    emit: pca_plot
+    path "pca_plot.png",    emit: pca_plot
     path "pca_coords.tsv",  emit: pca_coords
 
     script:
@@ -134,7 +134,7 @@ process PCA {
     Rscript ${projectDir}/bin/03_pca.R \\
         --input         ${normalized_matrix} \\
         --sample-sheet  ${sample_sheet} \\
-        --output-plot   pca_plot.pdf \\
+        --output-plot   pca_plot.png \\
         --output-data   pca_coords.tsv
     """
 }
@@ -154,7 +154,7 @@ process DA_MULTI {
 
     output:
     path "da_results_all_comparisons.tsv", emit: da_results
-    path "volcano_*.pdf",                  emit: volcanos
+    path "volcano_*.png",                  emit: volcanos
     path "da_results_*_vs_*.tsv",          emit: da_per_comparison, optional: true
 
     script:
@@ -182,13 +182,14 @@ process ENRICHMENT {
 
     output:
     path "enrichment_results.tsv",  emit: enrichment_results
-    path "*.pdf",                   emit: enrichment_plots, optional: true
+    path "*.png",                   emit: enrichment_plots, optional: true
 
     script:
     """
     Rscript ${projectDir}/bin/05_enrichment.R \\
         --da-results    ${da_results} \\
         --output-dir    . \\
+        --organism      ${params.organism} \\
         --fdr-cutoff    ${params.fdr_cutoff}
     """
 }
