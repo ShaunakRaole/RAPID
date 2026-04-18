@@ -1,4 +1,4 @@
-name: proteomicsda
+name: rapid
 channels:
   - conda-forge
   - bioconda
@@ -12,7 +12,10 @@ dependencies:
   - r-rmarkdown
   - r-knitr
   - r-kableextra
+  - r-bit64
   - bioconductor-limma
   - bioconductor-deqms
+  - bioconductor-clusterprofiler
+  - bioconductor-org.hs.eg.db
+  - bioconductor-enrichplot
   - wget
-  - r-bit64
