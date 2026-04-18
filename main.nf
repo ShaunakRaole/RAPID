@@ -15,6 +15,7 @@ nextflow.enable.dsl = 2
 //   5. DA_MULTI        — all pairwise DEqMS comparisons
 //   6. ENRICHMENT      — GO/KEGG pathway enrichment
 //   7. REPORT          — self-contained HTML report
+//   8. VALIDATE        — output validation and integrity checks
 // ============================================================
 
 log.info """
@@ -232,6 +233,44 @@ process REPORT {
 }
 
 // ============================================================
+// PROCESS 8: Output validation
+// ============================================================
+process VALIDATE {
+    tag "validate"
+    label 'process_low'
+
+    publishDir "${params.outdir}/validation", mode: 'copy'
+
+    input:
+    path filtered_matrix
+    path normalized_matrix
+    path pca_coords
+    path da_results
+    path enrichment_results
+    path report
+    path qc_summary
+    path sample_sheet
+
+    output:
+    path "validation_report.txt", emit: validation_report
+
+    script:
+    """
+    Rscript ${projectDir}/bin/07_validate.R \\
+        --filtered-matrix    ${filtered_matrix} \\
+        --normalized-matrix  ${normalized_matrix} \\
+        --pca-coords         ${pca_coords} \\
+        --da-results         ${da_results} \\
+        --enrichment-results ${enrichment_results} \\
+        --report             ${report} \\
+        --qc-summary         ${qc_summary} \\
+        --sample-sheet       ${sample_sheet} \\
+        --output             validation_report.txt \\
+        --min-proteins       ${params.min_valid_values}
+    """
+}
+
+// ============================================================
 // WORKFLOW
 // ============================================================
 workflow {
@@ -273,6 +312,17 @@ workflow {
         PCA.out.pca_plot,
         DA_MULTI.out.da_results,
         ENRICHMENT.out.enrichment_results,
+        sample_sheet_ch
+    )
+
+    VALIDATE(
+        QC_FILTER.out.filtered_matrix,
+        NORMALIZE.out.normalized_matrix,
+        PCA.out.pca_coords,
+        DA_MULTI.out.da_results,
+        ENRICHMENT.out.enrichment_results,
+        REPORT.out.report,
+        QC_FILTER.out.qc_summary,
         sample_sheet_ch
     )
 }
