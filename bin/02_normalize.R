@@ -28,20 +28,20 @@ parse_args <- function(args) {
     output       = "normalized_matrix.tsv",
     boxplot      = "normalization_boxplot.pdf"
   )
-
+  
   i <- 1
   while (i <= length(args)) {
     switch(args[i],
-      "--input"        = { defaults$input        <- args[i+1]; i <- i+2 },
-      "--sample-sheet" = { defaults$sample_sheet <- args[i+1]; i <- i+2 },
-      "--output"       = { defaults$output        <- args[i+1]; i <- i+2 },
-      "--boxplot"      = { defaults$boxplot        <- args[i+1]; i <- i+2 },
-      {
-        stop(sprintf("Unknown argument: %s", args[i]))
-      }
+           "--input"        = { defaults$input        <- args[i+1]; i <- i+2 },
+           "--sample-sheet" = { defaults$sample_sheet <- args[i+1]; i <- i+2 },
+           "--output"       = { defaults$output        <- args[i+1]; i <- i+2 },
+           "--boxplot"      = { defaults$boxplot        <- args[i+1]; i <- i+2 },
+           {
+             stop(sprintf("Unknown argument: %s", args[i]))
+           }
     )
   }
-
+  
   if (is.null(defaults$input))        stop("--input is required")
   if (is.null(defaults$sample_sheet)) stop("--sample-sheet is required")
   defaults
@@ -66,10 +66,10 @@ if (length(missing) > 0) {
 # -----------------------------------------------------------------------------
 melt_intensities <- function(mat, intensity_cols, ss, label) {
   long <- melt(mat,
-    id.vars      = c("protein_id", "gene_names"),
-    measure.vars = intensity_cols,
-    variable.name = "sample",
-    value.name   = "intensity"
+               id.vars      = c("protein_id", "gene_names"),
+               measure.vars = intensity_cols,
+               variable.name = "sample",
+               value.name   = "intensity"
   )
   long <- long[!is.na(intensity)]
   long <- merge(long, ss[, .(sample, condition)], by = "sample")
@@ -142,7 +142,10 @@ p <- ggplot(long_both, aes(x = sample, y = intensity, fill = condition)) +
     legend.position = "right"
   )
 
-pdf(opt$boxplot, width = max(8, length(intensity_cols) * 0.8 + 2), height = 8)
+png(opt$boxplot,
+    width  = max(800, length(intensity_cols) * 80 + 200),
+    height = 800,
+    res    = 120)
 print(p)
 dev.off()
 
