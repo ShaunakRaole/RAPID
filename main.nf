@@ -3,24 +3,26 @@
 nextflow.enable.dsl = 2
 
 // ============================================================
-// ProteomicsDA — Reproducible Proteomics Differential Abundance
+// RAPID — Reproducible Analysis Pipeline for Intensity-based
+//         proteomics Data
 // ============================================================
 // Modules:
-//   1. DOWNLOAD_DATA   — fetch MaxQuant proteinGroups.txt from PRIDE
-//   2. QC_FILTER       — remove contaminants, reverse hits, high-missingness proteins
+//   1. DOWNLOAD_DATA   — fetch MaxQuant proteinGroups.txt
+//   2. QC_FILTER       — remove contaminants, reverse hits,
+//                        low-coverage proteins
 //   3. NORMALIZE       — log2 transform + median centering
-//   4. DA_ANALYSIS     — DEqMS differential abundance analysis
-//   5. REPORT          — HTML report with volcano plot and summary table
+//   4. PCA             — PCA plot of normalized matrix
+//   5. DA_MULTI        — all pairwise DEqMS comparisons
+//   6. ENRICHMENT      — GO/KEGG pathway enrichment
+//   7. REPORT          — self-contained HTML report
 // ============================================================
 
 log.info """
 =========================================
- P R O T E O M I C S - D A   P I P E L I N E
+ R A P I D   P I P E L I N E
 =========================================
 Dataset URL  : ${params.data_url}
 Sample sheet : ${params.sample_sheet}
-Condition A  : ${params.condition_a}
-Condition B  : ${params.condition_b}
 Min valid    : ${params.min_valid_values}
 FDR cutoff   : ${params.fdr_cutoff}
 FC cutoff    : ${params.fc_cutoff}
@@ -46,12 +48,10 @@ process DOWNLOAD_DATA {
         "${params.data_url}" \\
         -O proteinGroups.txt
 
-    # Sanity check: file must exist and be non-empty
-    [ -s proteinGroups.txt ] || { echo "ERROR: Download failed or file is empty"; exit 1; }
+    [ -s proteinGroups.txt ] || { echo "ERROR: Download failed or empty"; exit 1; }
 
-    # Sanity check: must look like a MaxQuant proteinGroups file
     head -1 proteinGroups.txt | grep -q "Protein IDs" || \\
-        { echo "ERROR: File does not appear to be a MaxQuant proteinGroups.txt"; exit 1; }
+        { echo "ERROR: Not a MaxQuant proteinGroups file"; exit 1; }
 
     echo "Download complete: \$(wc -l < proteinGroups.txt) lines"
     """
@@ -71,8 +71,8 @@ process QC_FILTER {
     path sample_sheet
 
     output:
-    path "filtered_matrix.tsv",   emit: filtered_matrix
-    path "qc_summary.txt",        emit: qc_summary
+    path "filtered_matrix.tsv", emit: filtered_matrix
+    path "qc_summary.txt",      emit: qc_summary
 
     script:
     """
@@ -99,7 +99,7 @@ process NORMALIZE {
     path sample_sheet
 
     output:
-    path "normalized_matrix.tsv",      emit: normalized_matrix
+    path "normalized_matrix.tsv",     emit: normalized_matrix
     path "normalization_boxplot.pdf",  emit: boxplot
 
     script:
@@ -113,10 +113,37 @@ process NORMALIZE {
 }
 
 // ============================================================
-// PROCESS 4: Differential abundance analysis
+// PROCESS 4: PCA
 // ============================================================
-process DA_ANALYSIS {
-    tag "da_analysis"
+process PCA {
+    tag "pca"
+    label 'process_low'
+
+    publishDir "${params.outdir}/qc", mode: 'copy'
+
+    input:
+    path normalized_matrix
+    path sample_sheet
+
+    output:
+    path "pca_plot.pdf",    emit: pca_plot
+    path "pca_coords.tsv",  emit: pca_coords
+
+    script:
+    """
+    Rscript ${projectDir}/bin/03_pca.R \\
+        --input         ${normalized_matrix} \\
+        --sample-sheet  ${sample_sheet} \\
+        --output-plot   pca_plot.pdf \\
+        --output-data   pca_coords.tsv
+    """
+}
+
+// ============================================================
+// PROCESS 5: All pairwise differential abundance
+// ============================================================
+process DA_MULTI {
+    tag "da_multi"
     label 'process_low'
 
     publishDir "${params.outdir}/results", mode: 'copy'
@@ -126,25 +153,48 @@ process DA_ANALYSIS {
     path sample_sheet
 
     output:
-    path "da_results.tsv",     emit: da_results
-    path "volcano_plot.pdf",   emit: volcano
+    path "da_results_all_comparisons.tsv", emit: da_results
+    path "volcano_*.pdf",                  emit: volcanos
+    path "da_results_*_vs_*.tsv",          emit: da_per_comparison, optional: true
 
     script:
     """
-    Rscript ${projectDir}/bin/03_da_analysis.R \\
+    Rscript ${projectDir}/bin/04_da_multi.R \\
         --input         ${normalized_matrix} \\
         --sample-sheet  ${sample_sheet} \\
-        --condition-a   "${params.condition_a}" \\
-        --condition-b   "${params.condition_b}" \\
         --fdr-cutoff    ${params.fdr_cutoff} \\
         --fc-cutoff     ${params.fc_cutoff} \\
-        --output        da_results.tsv \\
-        --volcano       volcano_plot.pdf
+        --output-dir    .
     """
 }
 
 // ============================================================
-// PROCESS 5: HTML report
+// PROCESS 6: Pathway enrichment
+// ============================================================
+process ENRICHMENT {
+    tag "enrichment"
+    label 'process_low'
+
+    publishDir "${params.outdir}/enrichment", mode: 'copy'
+
+    input:
+    path da_results
+
+    output:
+    path "enrichment_results.tsv",  emit: enrichment_results
+    path "*.pdf",                   emit: enrichment_plots, optional: true
+
+    script:
+    """
+    Rscript ${projectDir}/bin/05_enrichment.R \\
+        --da-results    ${da_results} \\
+        --output-dir    . \\
+        --fdr-cutoff    ${params.fdr_cutoff}
+    """
+}
+
+// ============================================================
+// PROCESS 7: HTML report
 // ============================================================
 process REPORT {
     tag "report"
@@ -155,8 +205,9 @@ process REPORT {
     input:
     path qc_summary
     path boxplot
+    path pca_plot
     path da_results
-    path volcano
+    path enrichment_results
     path sample_sheet
 
     output:
@@ -164,17 +215,18 @@ process REPORT {
 
     script:
     """
-    Rscript ${projectDir}/bin/04_report.R \\
-        --qc-summary    ${qc_summary} \\
-        --boxplot       ${boxplot} \\
-        --da-results    ${da_results} \\
-        --volcano       ${volcano} \\
-        --sample-sheet  ${sample_sheet} \\
-        --condition-a   "${params.condition_a}" \\
-        --condition-b   "${params.condition_b}" \\
-        --fdr-cutoff    ${params.fdr_cutoff} \\
-        --fc-cutoff     ${params.fc_cutoff} \\
-        --output        proteomics_report.html
+    Rscript ${projectDir}/bin/06_report.R \\
+        --qc-summary           ${qc_summary} \\
+        --boxplot              ${boxplot} \\
+        --pca-plot             ${pca_plot} \\
+        --da-results           ${da_results} \\
+        --enrichment-results   ${enrichment_results} \\
+        --sample-sheet         ${sample_sheet} \\
+        --condition-a          "${params.condition_a}" \\
+        --condition-b          "${params.condition_b}" \\
+        --fdr-cutoff           ${params.fdr_cutoff} \\
+        --fc-cutoff            ${params.fc_cutoff} \\
+        --output               proteomics_report.html
     """
 }
 
@@ -183,16 +235,11 @@ process REPORT {
 // ============================================================
 workflow {
 
-    // Validate required parameters
-    if (!params.data_url)      error "ERROR: --data_url is required"
-    if (!params.sample_sheet)  error "ERROR: --sample_sheet is required"
-    if (!params.condition_a)   error "ERROR: --condition_a is required"
-    if (!params.condition_b)   error "ERROR: --condition_b is required"
+    if (!params.data_url)    error "ERROR: --data_url is required"
+    if (!params.sample_sheet) error "ERROR: --sample_sheet is required"
 
-    // Input channels
     sample_sheet_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)
 
-    // Run pipeline
     DOWNLOAD_DATA()
 
     QC_FILTER(
@@ -205,16 +252,26 @@ workflow {
         sample_sheet_ch
     )
 
-    DA_ANALYSIS(
+    PCA(
         NORMALIZE.out.normalized_matrix,
         sample_sheet_ch
+    )
+
+    DA_MULTI(
+        NORMALIZE.out.normalized_matrix,
+        sample_sheet_ch
+    )
+
+    ENRICHMENT(
+        DA_MULTI.out.da_results
     )
 
     REPORT(
         QC_FILTER.out.qc_summary,
         NORMALIZE.out.boxplot,
-        DA_ANALYSIS.out.da_results,
-        DA_ANALYSIS.out.volcano,
+        PCA.out.pca_plot,
+        DA_MULTI.out.da_results,
+        ENRICHMENT.out.enrichment_results,
         sample_sheet_ch
     )
 }
