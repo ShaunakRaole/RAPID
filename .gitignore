@@ -1,0 +1,30 @@
+# Nextflow working directories and logs
+work/
+.nextflow/
+.nextflow.log
+.nextflow.log.*
+
+# Pipeline outputs (not source code)
+results/
+test_results/
+
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Conda environments (too large to commit)
+.conda/
+
+# Temporary files
+*.tmp
+*.log
+*.swp
