@@ -29,18 +29,18 @@ parse_args <- function(args) {
     output_plot  = "pca_plot.pdf",
     output_data  = "pca_coords.tsv"
   )
-
+  
   i <- 1
   while (i <= length(args)) {
     switch(args[i],
-      "--input"        = { defaults$input        <- args[i+1]; i <- i+2 },
-      "--sample-sheet" = { defaults$sample_sheet <- args[i+1]; i <- i+2 },
-      "--output-plot"  = { defaults$output_plot  <- args[i+1]; i <- i+2 },
-      "--output-data"  = { defaults$output_data  <- args[i+1]; i <- i+2 },
-      { stop(sprintf("Unknown argument: %s", args[i])) }
+           "--input"        = { defaults$input        <- args[i+1]; i <- i+2 },
+           "--sample-sheet" = { defaults$sample_sheet <- args[i+1]; i <- i+2 },
+           "--output-plot"  = { defaults$output_plot  <- args[i+1]; i <- i+2 },
+           "--output-data"  = { defaults$output_data  <- args[i+1]; i <- i+2 },
+           { stop(sprintf("Unknown argument: %s", args[i])) }
     )
   }
-
+  
   if (is.null(defaults$input))        stop("--input is required")
   if (is.null(defaults$sample_sheet)) stop("--sample-sheet is required")
   defaults
@@ -120,7 +120,7 @@ p <- ggplot(pca_df, aes(x = PC1, y = PC2, colour = condition, label = sample)) +
   theme_minimal(base_size = 13) +
   theme(legend.position = "right")
 
-pdf(opt$output_plot, width = 7, height = 6)
+png(opt$output_plot, width = 800, height = 650, res = 120)
 print(p)
 dev.off()
 cat(sprintf("[PCA] Wrote PCA plot: %s\n", opt$output_plot))
