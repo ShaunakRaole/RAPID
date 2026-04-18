@@ -33,7 +33,8 @@ RUN Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2
         'bit64' \
     ), dependencies = TRUE)"
 
-# Bioconductor packages
+# Core Bioconductor packages (analysis + visualization)
+# Split from annotation packages so Docker cache is preserved if OrgDb downloads fail
 RUN Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2024-06-01')); \
     if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
     BiocManager::install(version = '3.18', ask = FALSE, update = FALSE); \
@@ -41,16 +42,26 @@ RUN Rscript -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/2
         'limma', \
         'DEqMS', \
         'clusterProfiler', \
-        'org.Hs.eg.db', \
         'enrichplot' \
     ), ask = FALSE, update = FALSE)"
 
-# Verify all packages installed
+# Organism annotation packages — large downloads, separated for caching
+# If this step fails due to Bioconductor server issues, rebuild will
+# resume from here without reinstalling the packages above
+RUN Rscript -e "BiocManager::install(c( \
+        'org.Hs.eg.db', \
+        'org.Mm.eg.db', \
+        'org.Rn.eg.db', \
+        'org.Sc.sgd.db' \
+    ), ask = FALSE, update = FALSE)"
+
+# Verify all packages installed correctly
 RUN Rscript -e " \
     pkgs <- c('data.table', 'ggplot2', 'ggrepel', 'rmarkdown', \
               'knitr', 'kableExtra', 'bit64', \
-              'limma', 'DEqMS', 'clusterProfiler', \
-              'org.Hs.eg.db', 'enrichplot'); \
+              'limma', 'DEqMS', 'clusterProfiler', 'enrichplot', \
+              'org.Hs.eg.db', 'org.Mm.eg.db', \
+              'org.Rn.eg.db', 'org.Sc.sgd.db'); \
     for (p in pkgs) { \
         if (!requireNamespace(p, quietly = TRUE)) \
             stop(paste('Package not installed:', p)); \
