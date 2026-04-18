@@ -67,21 +67,21 @@ parse_args <- function(args) {
     fdr_cutoff  = 0.05,
     min_genes   = 3
   )
-
+  
   i <- 1
   while (i <= length(args)) {
     switch(args[i],
-      "--da-results" = { defaults$da_results <- args[i+1]; i <- i+2 },
-      "--output-dir" = { defaults$output_dir <- args[i+1]; i <- i+2 },
-      "--organism"   = { defaults$organism   <- tolower(args[i+1]); i <- i+2 },
-      "--fdr-cutoff" = { defaults$fdr_cutoff <- as.numeric(args[i+1]); i <- i+2 },
-      "--min-genes"  = { defaults$min_genes  <- as.integer(args[i+1]); i <- i+2 },
-      { stop(sprintf("Unknown argument: %s", args[i])) }
+           "--da-results" = { defaults$da_results <- args[i+1]; i <- i+2 },
+           "--output-dir" = { defaults$output_dir <- args[i+1]; i <- i+2 },
+           "--organism"   = { defaults$organism   <- tolower(args[i+1]); i <- i+2 },
+           "--fdr-cutoff" = { defaults$fdr_cutoff <- as.numeric(args[i+1]); i <- i+2 },
+           "--min-genes"  = { defaults$min_genes  <- as.integer(args[i+1]); i <- i+2 },
+           { stop(sprintf("Unknown argument: %s", args[i])) }
     )
   }
-
+  
   if (is.null(defaults$da_results)) stop("--da-results is required")
-
+  
   if (!defaults$organism %in% names(ORGANISM_MAP)) {
     stop(sprintf(
       "Unsupported organism '%s'. Choose from: %s",
@@ -89,7 +89,7 @@ parse_args <- function(args) {
       paste(names(ORGANISM_MAP), collapse = ", ")
     ))
   }
-
+  
   defaults
 }
 
@@ -137,13 +137,13 @@ cat(sprintf("[ENRICH] Comparisons: %s\n", paste(comparisons, collapse = ", ")))
 # Helper: map identifiers to Entrez IDs
 # -----------------------------------------------------------------------------
 map_to_entrez <- function(gene_names_vec, protein_ids_vec, org_info, orgdb) {
-
+  
   clean_genes <- gsub(";.*", "", gene_names_vec)
   clean_genes <- trimws(clean_genes)
   clean_genes <- unique(clean_genes[clean_genes != "" & !is.na(clean_genes)])
-
+  
   mapped_entrez <- character(0)
-
+  
   # Try primary ID type (gene symbol / ORF name)
   if (length(clean_genes) > 0) {
     mapped <- tryCatch(
@@ -161,18 +161,18 @@ map_to_entrez <- function(gene_names_vec, protein_ids_vec, org_info, orgdb) {
                   org_info$id_type, length(mapped_entrez), length(clean_genes)))
     }
   }
-
+  
   # Fallback: try UniProt IDs if symbol mapping failed or returned few hits
   if (length(mapped_entrez) < 3) {
     uniprot_ids <- gsub(";.*", "", protein_ids_vec)
     uniprot_ids <- trimws(uniprot_ids)
     uniprot_ids <- unique(uniprot_ids[uniprot_ids != "" & !is.na(uniprot_ids)])
-
+    
     # Only try UNIPROT fallback if it's a valid keytype for this OrgDb
     available_keytypes <- tryCatch(
       keytypes(orgdb), error = function(e) character(0)
     )
-
+    
     if ("UNIPROT" %in% available_keytypes && length(uniprot_ids) > 0) {
       mapped_u <- tryCatch(
         suppressMessages(suppressWarnings(
@@ -190,7 +190,7 @@ map_to_entrez <- function(gene_names_vec, protein_ids_vec, org_info, orgdb) {
       }
     }
   }
-
+  
   mapped_entrez
 }
 
@@ -200,15 +200,15 @@ map_to_entrez <- function(gene_names_vec, protein_ids_vec, org_info, orgdb) {
 run_enrichment <- function(entrez_ids, universe_entrez, label,
                            output_dir, org_info, orgdb,
                            fdr_cutoff, min_genes) {
-
+  
   if (length(entrez_ids) < min_genes) {
     cat(sprintf("[ENRICH]   Skipping %s: only %d genes mapped (need >=%d)\n",
                 label, length(entrez_ids), min_genes))
     return(NULL)
   }
-
+  
   results <- list()
-
+  
   # GO Biological Process
   cat(sprintf("[ENRICH]   GO BP for %s (%d genes)\n", label, length(entrez_ids)))
   go_result <- tryCatch(
@@ -226,7 +226,7 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       cat(sprintf("[ENRICH]   GO BP failed: %s\n", e$message)); NULL
     }
   )
-
+  
   if (!is.null(go_result) && nrow(go_result@result) > 0) {
     sig_go <- go_result@result[go_result@result$p.adjust < fdr_cutoff, ]
     if (nrow(sig_go) > 0) {
@@ -234,13 +234,13 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       go_df[, comparison := label]
       go_df[, analysis   := "GO_BP"]
       results[["go"]] <- go_df
-
+      
       n_show <- min(20, nrow(sig_go))
       p <- dotplot(go_result, showCategory = n_show, font.size = 9) +
         labs(title = sprintf("GO BP: %s", gsub("_", " ", label))) +
         theme(plot.title = element_text(size = 11))
-      plot_path <- file.path(output_dir, sprintf("go_dotplot_%s.pdf", label))
-      pdf(plot_path, width = 10, height = max(5, n_show * 0.4 + 2))
+      plot_path <- file.path(output_dir, sprintf("go_dotplot_%s.png", label))
+      png(plot_path, width = 1000, height = max(500, n_show * 40 + 200), res = 120)
       print(p)
       dev.off()
       cat(sprintf("[ENRICH]   Wrote: %s\n", plot_path))
@@ -248,7 +248,7 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       cat(sprintf("[ENRICH]   No significant GO terms for %s\n", label))
     }
   }
-
+  
   # KEGG
   cat(sprintf("[ENRICH]   KEGG for %s\n", label))
   kegg_result <- tryCatch(
@@ -264,7 +264,7 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       cat(sprintf("[ENRICH]   KEGG failed: %s\n", e$message)); NULL
     }
   )
-
+  
   if (!is.null(kegg_result) && nrow(kegg_result@result) > 0) {
     sig_kegg <- kegg_result@result[kegg_result@result$p.adjust < fdr_cutoff, ]
     if (nrow(sig_kegg) > 0) {
@@ -272,13 +272,13 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       kegg_df[, comparison := label]
       kegg_df[, analysis   := "KEGG"]
       results[["kegg"]] <- kegg_df
-
+      
       n_show <- min(20, nrow(sig_kegg))
       p <- dotplot(kegg_result, showCategory = n_show, font.size = 9) +
         labs(title = sprintf("KEGG: %s", gsub("_", " ", label))) +
         theme(plot.title = element_text(size = 11))
-      plot_path <- file.path(output_dir, sprintf("kegg_dotplot_%s.pdf", label))
-      pdf(plot_path, width = 10, height = max(5, n_show * 0.4 + 2))
+      plot_path <- file.path(output_dir, sprintf("kegg_dotplot_%s.png", label))
+      png(plot_path, width = 1000, height = max(500, n_show * 40 + 200), res = 120)
       print(p)
       dev.off()
       cat(sprintf("[ENRICH]   Wrote: %s\n", plot_path))
@@ -286,7 +286,7 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
       cat(sprintf("[ENRICH]   No significant KEGG pathways for %s\n", label))
     }
   }
-
+  
   if (length(results) == 0) return(NULL)
   rbindlist(results, use.names = TRUE, fill = TRUE)
 }
@@ -296,7 +296,7 @@ run_enrichment <- function(entrez_ids, universe_entrez, label,
 # -----------------------------------------------------------------------------
 cat("[ENRICH] Building background gene universe\n")
 universe_entrez <- map_to_entrez(res$gene_names, res$protein_id,
-                                  org_info, orgdb)
+                                 org_info, orgdb)
 cat(sprintf("[ENRICH] Universe: %d Entrez IDs\n", length(universe_entrez)))
 
 out_path <- file.path(opt$output_dir, "enrichment_results.tsv")
@@ -323,13 +323,13 @@ for (comp in comparisons) {
   cat(sprintf("[ENRICH] Processing: %s\n", comp))
   sig <- res[comparison == comp & significant == TRUE]
   cat(sprintf("[ENRICH]   Significant proteins: %d\n", nrow(sig)))
-
+  
   if (nrow(sig) == 0) next
-
+  
   entrez_ids <- map_to_entrez(sig$gene_names, sig$protein_id,
-                               org_info, orgdb)
+                              org_info, orgdb)
   cat(sprintf("[ENRICH]   Mapped to Entrez: %d\n", length(entrez_ids)))
-
+  
   enrich_res <- run_enrichment(
     entrez_ids      = entrez_ids,
     universe_entrez = universe_entrez,
@@ -340,7 +340,7 @@ for (comp in comparisons) {
     fdr_cutoff      = opt$fdr_cutoff,
     min_genes       = opt$min_genes
   )
-
+  
   if (!is.null(enrich_res)) all_enrichment[[comp]] <- enrich_res
 }
 
