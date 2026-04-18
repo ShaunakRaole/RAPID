@@ -103,9 +103,13 @@ peptide_counts[peptide_counts < 1] <- 1  # guard against zeros
 # -----------------------------------------------------------------------------
 # Limma design matrix
 # -----------------------------------------------------------------------------
+# Prefix with 'cond_' if name starts with a number
+safe_a <- make.names(opt$condition_a)
+safe_b <- make.names(opt$condition_b)
+
 condition_factor <- factor(
-  ss_sub$condition,
-  levels = c(opt$condition_a, opt$condition_b)
+  make.names(ss_sub$condition),
+  levels = c(safe_a, safe_b)
 )
 
 design <- model.matrix(~ 0 + condition_factor)
@@ -115,7 +119,7 @@ cat("[DA] Design matrix:\n")
 print(design)
 
 # Contrast: condition_b vs condition_a (positive FC = up in B)
-contrast_str <- sprintf("%s-%s", opt$condition_b, opt$condition_a)
+contrast_str <- sprintf("%s-%s", safe_b, safe_a)
 contrast_mat <- makeContrasts(
   contrasts = contrast_str,
   levels    = design
