@@ -1,0 +1,168 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  test-pipeline:
+    name: End-to-end pipeline test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required for Nextflow)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install Nextflow
+        run: |
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+          nextflow -version
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          activate-environment: rapid
+          environment-file: environment.yml
+          auto-activate-base: false
+          channels: conda-forge,bioconda,defaults
+          channel-priority: strict
+
+      - name: Verify conda environment
+        run: |
+          conda activate rapid
+          Rscript -e "
+            pkgs <- c('data.table', 'ggplot2', 'ggrepel', 'rmarkdown',
+                      'knitr', 'kableExtra', 'bit64',
+                      'limma', 'DEqMS', 'clusterProfiler',
+                      'org.Hs.eg.db', 'enrichplot')
+            for (p in pkgs) {
+              if (!requireNamespace(p, quietly = TRUE))
+                stop(paste('Package not installed:', p))
+              cat(sprintf('OK: %s %s\n', p, as.character(packageVersion(p))))
+            }
+          "
+
+      - name: Run RAPID pipeline on CPTAC test data
+        run: |
+          nextflow run main.nf \
+            -profile conda \
+            --data_url "https://raw.githubusercontent.com/statOmics/PDA21/data/quantification/cptacAvsB_lab3/proteinGroups.txt" \
+            --sample_sheet test-data/test_sample_sheet.csv \
+            --condition_a 6A \
+            --condition_b 6B \
+            --organism human \
+            --outdir ci_results \
+            -with-trace
+
+      - name: Validate outputs exist
+        run: |
+          echo "Checking expected output files exist..."
+          files=(
+            "ci_results/raw/proteinGroups.txt"
+            "ci_results/qc/filtered_matrix.tsv"
+            "ci_results/qc/qc_summary.txt"
+            "ci_results/qc/pca_plot.pdf"
+            "ci_results/normalized/normalized_matrix.tsv"
+            "ci_results/normalized/normalization_boxplot.pdf"
+            "ci_results/results/da_results_all_comparisons.tsv"
+            "ci_results/enrichment/enrichment_results.tsv"
+            "ci_results/report/proteomics_report.html"
+          )
+          error=0
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  OK: $f"
+            else
+              echo "  MISSING: $f"
+              error=1
+            fi
+          done
+          if [ $error -ne 0 ]; then
+            echo "One or more expected output files are missing."
+            exit 1
+          fi
+          echo "All expected output files present."
+
+      - name: Validate output content
+        run: |
+          echo "Validating output content..."
+
+          # Check filtered matrix has proteins
+          n_proteins=$(tail -n +2 ci_results/qc/filtered_matrix.tsv | wc -l)
+          echo "  Filtered proteins: $n_proteins"
+          if [ "$n_proteins" -lt 100 ]; then
+            echo "  FAIL: Expected at least 100 proteins, got $n_proteins"
+            exit 1
+          fi
+          echo "  OK: Protein count ($n_proteins >= 100)"
+
+          # Check DA results has expected columns
+          header=$(head -1 ci_results/results/da_results_all_comparisons.tsv)
+          for col in "protein_id" "log2FC" "adj_pvalue" "significant" "comparison"; do
+            if echo "$header" | grep -q "$col"; then
+              echo "  OK: Column '$col' present"
+            else
+              echo "  FAIL: Column '$col' missing from DA results"
+              exit 1
+            fi
+          done
+
+          # Check DA results has rows
+          n_da=$(tail -n +2 ci_results/results/da_results_all_comparisons.tsv | wc -l)
+          echo "  DA result rows: $n_da"
+          if [ "$n_da" -lt 50 ]; then
+            echo "  FAIL: Expected at least 50 DA result rows, got $n_da"
+            exit 1
+          fi
+          echo "  OK: DA result row count ($n_da >= 50)"
+
+          # Check HTML report is non-empty and looks like HTML
+          report_size=$(wc -c < ci_results/report/proteomics_report.html)
+          echo "  Report size: $report_size bytes"
+          if [ "$report_size" -lt 10000 ]; then
+            echo "  FAIL: Report is suspiciously small ($report_size bytes)"
+            exit 1
+          fi
+          if ! grep -q "<html" ci_results/report/proteomics_report.html; then
+            echo "  FAIL: Report does not appear to be valid HTML"
+            exit 1
+          fi
+          echo "  OK: HTML report looks valid ($report_size bytes)"
+
+          # Check QC summary has expected content
+          if grep -q "Final proteins for analysis" ci_results/qc/qc_summary.txt; then
+            echo "  OK: QC summary contains expected content"
+          else
+            echo "  FAIL: QC summary missing expected content"
+            exit 1
+          fi
+
+          echo "All output validation checks passed."
+
+      - name: Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapid-test-results
+          path: |
+            ci_results/report/proteomics_report.html
+            ci_results/qc/qc_summary.txt
+            ci_results/results/da_results_all_comparisons.tsv
+            .nextflow.log
+          retention-days: 7
