@@ -77,12 +77,13 @@ jobs:
             "ci_results/raw/proteinGroups.txt"
             "ci_results/qc/filtered_matrix.tsv"
             "ci_results/qc/qc_summary.txt"
-            "ci_results/qc/pca_plot.pdf"
+            "ci_results/qc/pca_plot.png"
             "ci_results/normalized/normalized_matrix.tsv"
-            "ci_results/normalized/normalization_boxplot.pdf"
+            "ci_results/normalized/normalization_boxplot.png"
             "ci_results/results/da_results_all_comparisons.tsv"
             "ci_results/enrichment/enrichment_results.tsv"
             "ci_results/report/proteomics_report.html"
+            "ci_results/validation/validation_report.txt"
           )
           error=0
           for f in "${files[@]}"; do
