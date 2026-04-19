@@ -1,0 +1,50 @@
+RAPID Pipeline — Output Validation Report
+Generated: 2026-04-19 16:16:38
+Overall status: PASSED WITH WARNINGS
+Passed: 39 | Warnings: 1 | Failed: 0
+
+=============================================================
+Detailed results:
+=============================================================
+
+[PASS] filtered_matrix.tsv: File exists (filtered_matrix.tsv, 397,555 bytes)
+[PASS] normalized_matrix.tsv: File exists (normalized_matrix.tsv, 693,096 bytes)
+[PASS] pca_coords.tsv: File exists (pca_coords.tsv, 813 bytes)
+[PASS] da_results.tsv: File exists (da_results_all_comparisons.tsv, 562,741 bytes)
+[PASS] enrichment_results.tsv: File exists (enrichment_results.tsv, 89 bytes)
+[PASS] proteomics_report.html: File exists (proteomics_report.html, 1,455,686 bytes)
+[PASS] qc_summary.txt: File exists (qc_summary.txt, 285 bytes)
+[PASS] protein_count: 2758 proteins (>= 2 required)
+[PASS] column_protein_id: Column 'protein_id' present
+[PASS] column_gene_names: Column 'gene_names' present
+[PASS] sample_columns: All 18 sample columns present
+[PASS] normalized_rows: Row count matches filtered matrix (2758 proteins)
+[PASS] normalized_range: Intensity range looks like log2 scale [15.9, 34.5]
+[PASS] pca_sample_count: PCA has 18 rows matching 18 samples
+[PASS] pca_col_PC1: Column 'PC1' present
+[PASS] pca_col_PC2: Column 'PC2' present
+[PASS] pca_col_sample: Column 'sample' present
+[PASS] pca_col_condition: Column 'condition' present
+[PASS] da_col_protein_id: Column 'protein_id' present
+[PASS] da_col_log2FC: Column 'log2FC' present
+[PASS] da_col_pvalue: Column 'pvalue' present
+[PASS] da_col_adj_pvalue: Column 'adj_pvalue' present
+[PASS] da_col_significant: Column 'significant' present
+[PASS] da_col_comparison: Column 'comparison' present
+[PASS] da_comparisons: 1 comparison(s): PD_vs_OR
+[PASS] pvalue_range: Adjusted p-values in valid range [0,1] (n=2556)
+[PASS] da_significant: 25 significant proteins found
+[PASS] log2fc_numeric: log2FC is numeric, range [-12.30, 4.81]
+[WARN] enrichment_results: Enrichment file is empty — no significant terms found
+       Note: Expected for non-human data or small significant protein sets
+[PASS] report_html: Report contains valid HTML structure
+[PASS] report_size: Report size is 1,455,686 bytes
+[PASS] report_section_QC_Summary: Section 'QC Summary' present in report
+[PASS] report_section_Normalization: Section 'Normalization' present in report
+[PASS] report_section_PCA: Section 'PCA' present in report
+[PASS] report_section_Differential_Abundance: Section 'Differential Abundance' present in report
+[PASS] report_section_Reproducibility: Section 'Reproducibility' present in report
+[PASS] qc_Raw_proteins: QC field 'Raw proteins' present
+[PASS] qc_Final_proteins_for_analysis: QC field 'Final proteins for analysis' present
+[PASS] qc_Samples: QC field 'Samples' present
+[PASS] qc_Conditions: QC field 'Conditions' present

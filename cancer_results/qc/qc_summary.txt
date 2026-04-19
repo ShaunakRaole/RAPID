@@ -1,0 +1,8 @@
+Raw proteins:                  3898
+After flag removal:            3844
+Removed (flags):               54
+After min-valid filter (>=2): 2758
+Removed (low coverage):        1086
+Final proteins for analysis:   2758
+Samples:                       18
+Conditions:                    OR, PD
