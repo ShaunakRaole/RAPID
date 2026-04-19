@@ -34,12 +34,12 @@ RAPID is a reproducible bioinformatics pipeline for analyzing label-free quantit
 
 RAPID addresses the reproducibility crisis in proteomics data analysis by providing:
 
-- **Single-command execution** from raw MaxQuant output to publication-ready results
-- **Full containerization** via Docker — identical results on any system
-- **Statistically appropriate methods** — DEqMS accounts for peptide-level quantification uncertainty, unlike generic limma
-- **Multi-organism support** — human, mouse, rat, and yeast pathway enrichment via clusterProfiler
-- **Automated validation** — built-in output integrity checks on every run
-- **CI/CD integration** — GitHub Actions lint and end-to-end tests on every commit
+- **Single-command execution**: from raw MaxQuant output to documented results
+- **Full containerization** via Docker: identical results on any system
+- **Statistically appropriate methods**: DEqMS accounts for peptide-level quantification uncertainty, unlike generic limma
+- **Multi-organism support**: human, mouse, rat, and yeast pathway enrichment via clusterProfiler
+- **Automated validation**: built-in output integrity checks on every run
+- **CI/CD integration**: GitHub Actions lint and end-to-end tests on every commit
 
 ### Why RAPID?
 
@@ -104,14 +104,14 @@ proteinGroups.txt
 
 | # | Module | Script | Description |
 |---|--------|--------|-------------|
-| 1 | `DOWNLOAD_DATA` | — | Downloads `proteinGroups.txt` from any URL |
+| 1 | `DOWNLOAD_DATA` | - | Downloads `proteinGroups.txt` from any URL |
 | 2 | `QC_FILTER` | `01_qc_filter.R` | Removes contaminants (`+`), reverse hits (`+`), site-only proteins (`+`), and proteins below minimum valid value threshold |
 | 3 | `NORMALIZE` | `02_normalize.R` | log2 transformation followed by median centering; generates before/after boxplot |
 | 4 | `PCA` | `03_pca.R` | PCA of normalized matrix with row-mean imputation for missing values |
 | 5 | `DA_MULTI` | `04_da_multi.R` | All pairwise DEqMS differential abundance comparisons; one volcano plot per comparison |
 | 6 | `ENRICHMENT` | `05_enrichment.R` | GO Biological Process and KEGG enrichment via clusterProfiler; organism-aware |
 | 7 | `REPORT` | `06_report.R` | Self-contained HTML report with all figures, tables, and reproducibility info |
-| 8 | `VALIDATE` | `08_validate.R` | Automated output validation — checks file existence, dimensions, column integrity, p-value ranges, and report structure |
+| 8 | `VALIDATE` | `08_validate.R` | Automated output validation -> checks file existence, dimensions, column integrity, p-value ranges, and report structure |
 
 ---
 
@@ -126,7 +126,7 @@ proteinGroups.txt
 | [Conda](https://docs.conda.io/) | any | Alternative execution environment |
 | Java | ≥ 11 | Required by Nextflow |
 
-### Step 1 — Install Nextflow
+### Step 1: Install Nextflow
 
 ```bash
 curl -s https://get.nextflow.io | bash
@@ -134,14 +134,14 @@ sudo mv nextflow /usr/local/bin/
 nextflow -version
 ```
 
-### Step 2 — Clone the repository
+### Step 2: Clone the repository
 
 ```bash
 git clone https://github.com/ShaunakRaole/RAPID.git
 cd RAPID
 ```
 
-### Step 3 — Set up your environment
+### Step 3: Set up your environment
 
 **Option A: Docker (recommended)**
 
@@ -214,7 +214,7 @@ The sample sheet is a plain CSV file describing your experimental design. It mus
 | Column | Required | Description |
 |--------|----------|-------------|
 | `sample` | ✅ | Unique sample identifier used in output files |
-| `condition` | ✅ | Experimental condition — must match `--condition_a` / `--condition_b` |
+| `condition` | ✅ | Experimental condition -> must match `--condition_a` / `--condition_b` |
 | `file_name` | ✅ | Must exactly match the suffix after `LFQ intensity ` in the MaxQuant `proteinGroups.txt` column header |
 
 **Example:**
@@ -237,7 +237,7 @@ head -1 proteinGroups.txt | tr '\t' '\n' | grep "LFQ intensity"
 # The file_name is everything after "LFQ intensity "
 ```
 
-> **Multi-condition support:** RAPID automatically detects all conditions in the sample sheet and runs all pairwise comparisons. You do not need to specify `--condition_a` and `--condition_b` for 3+ condition datasets — just leave them unset.
+> **Multi-condition support:** RAPID automatically detects all conditions in the sample sheet and runs all pairwise comparisons. You do not need to specify `--condition_a` and `--condition_b` for 3+ condition datasets (just leave them unset).
 
 ---
 
@@ -271,7 +271,7 @@ head -1 proteinGroups.txt | tr '\t' '\n' | grep "LFQ intensity"
 
 | Profile | Description | Use case |
 |---------|-------------|----------|
-| `docker` | Uses `shaunakraole/rapid:1.0` container | **Recommended** — fully reproducible, works on any system with Docker |
+| `docker` | Uses `shaunakraole/rapid:1.0` container | **Recommended** fully reproducible, works on any system with Docker |
 | `conda` | Uses `environment.yml` conda environment | Local development on Linux/macOS |
 | `test` | Pre-configured test run using CPTAC benchmark data | Verifying installation, CI/CD |
 | `test,docker` | Test profile + Docker | Clean end-to-end validation |
@@ -339,13 +339,13 @@ The main output `da_results_all_comparisons.tsv` contains:
 
 ## Test Data
 
-RAPID ships with a pre-configured test profile using the CPTAC benchmark dataset — a well-characterised proteomics gold standard used extensively in methods development.
+RAPID ships with a pre-configured test profile using the CPTAC benchmark dataset (a well-characterised proteomics gold standard used extensively in methods development).
 
-**Dataset:** CPTAC Study 6 — UPS1 spike-in (48 human proteins) in *S. cerevisiae* background  
-**Source:** [statOmics/PDA21](https://github.com/statOmics/PDA21) — Goeminne et al. (2016)  
+**Dataset:** CPTAC Study 6 -> UPS1 spike-in (48 human proteins) in *S. cerevisiae* background  
+**Source:** [statOmics/PDA21](https://github.com/statOmics/PDA21) - Goeminne et al. (2016)  
 **Conditions:** 6A (0.25 fmol/μL spike-in) vs 6B (0.74 fmol/μL spike-in)  
 **Samples:** 6 total (3 replicates per condition)  
-**Expected runtime:** ~5 minutes on a laptop  
+**Expected runtime:** A few seconds on a laptop  
 **Expected output:** ~2 significant UPS1 human proteins; enrichment sparse (mixed yeast/human background)
 
 ```bash
@@ -363,7 +363,7 @@ nextflow run main.nf -profile test,docker
 
 ### Why DEqMS instead of limma?
 
-Standard limma assumes equal prior variance across all proteins. In proteomics, proteins quantified by more peptides or PSMs have inherently more reliable intensity estimates. DEqMS (Zhen et al., 2020) explicitly models this relationship, providing better statistical power and accuracy — particularly important for proteins quantified by a single peptide.
+Standard limma assumes equal prior variance across all proteins. In proteomics, proteins quantified by more peptides or PSMs have inherently more reliable intensity estimates. DEqMS (Zhen et al., 2020) explicitly models this relationship, providing better statistical power and accuracy (particularly important for proteins quantified by a single peptide).
 
 ### Why median centering normalization?
 
@@ -407,7 +407,7 @@ Tool choice in proteomics differential abundance analysis substantially affects 
 > The `file_name` column in your sample sheet does not match the column names in `proteinGroups.txt`. Run `head -1 proteinGroups.txt | tr '\t' '\n' | grep "LFQ"` to see exact column names and update your sample sheet accordingly.
 
 **`make.names()` condition name warning**
-> Condition names starting with numbers (e.g. `6A`, `6B`) are automatically sanitized. This is expected behaviour — results will be correct.
+> Condition names starting with numbers (e.g. `6A`, `6B`) are automatically sanitized. This is expected behaviour, so results will be correct.
 
 **Empty enrichment results**
 > This is expected when: (a) the dataset contains non-human proteins (e.g. yeast), (b) fewer than 3 significant proteins are detected, or (c) the significant proteins do not cluster into annotated pathways at the chosen FDR threshold. Try `--fdr_cutoff 0.1 --fc_cutoff 0.5` for more permissive thresholds.
@@ -416,7 +416,7 @@ Tool choice in proteomics differential abundance analysis substantially affects 
 > Known Bioconductor post-link script issue on macOS ARM64. Install manually: `Rscript -e "BiocManager::install('org.Mm.eg.db')"`. All packages are pre-installed in the Docker image.
 
 **Pipeline runs but report is empty**
-> Delete the `work/` directory and rerun — stale cached results from a previous failed run may be staged. `rm -rf work/ && nextflow run main.nf ...`
+> Delete the `work/` directory and rerun. Stale cached results from a previous failed run may be staged. `rm -rf work/ && nextflow run main.nf ...`
 
 ---
 
@@ -488,7 +488,7 @@ If you use RAPID in your research, please cite:
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License (see [LICENSE](LICENSE) for details).
 
 ---
 
