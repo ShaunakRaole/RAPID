@@ -51,53 +51,77 @@ RAPID addresses the reproducibility crisis in proteomics data analysis by provid
 
 ---
 
+## Scientific Background
+
+### What is LFQ proteomics?
+
+Label-free quantitative (LFQ) proteomics is an approach for measuring protein abundance across multiple biological samples without isotopic labels. Proteins are first digested into peptides using trypsin, separated by liquid chromatography, and analyzed by tandem mass spectrometry. MaxQuant processes the resulting raw files to identify peptides and compute LFQ intensities: normalized signal values comparable across samples. The output is a file called `proteinGroups.txt`, which contains one row per identified protein group and columns for LFQ intensity per sample, peptide counts, gene names, and quality flags.
+
+RAPID takes this file as input. Most labs using MaxQuant already have it sitting on a server after every experiment. The goal of RAPID is to provide a standard, reproducible way to go from that file to differential abundance results, without requiring users to write R scripts or click through a GUI.
+
+### The demo dataset
+
+The human cancer dataset used here comes from the statOmics proteomics data analysis course and consists of label-free quantitative proteomics measurements from 18 human cancer samples: (condition: OR) (condition: PD).
+
+It is publicly available via the statOmics GitHub repository.
+
+### Why DEqMS instead of limma?
+
+Standard limma assumes equal prior variance across all proteins. In proteomics, proteins quantified by more peptides or PSMs have inherently more reliable intensity estimates. DEqMS (Zhen et al., 2020) explicitly models this relationship by fitting a curve of variance vs. peptide count and using it as a protein-specific prior. This gives better statistical power and accuracy, particularly for proteins quantified by a single peptide.
+
+### Why median centering normalization?
+
+Median centering is a robust normalization method for LFQ data. It shifts each sample's median to a common global median, correcting systematic technical differences between samples without assuming that most proteins are unchanged. MaxQuant's LFQ algorithm already does substantial normalization during quantification, so in well-processed datasets the before and after distributions will look similar. The normalization module still runs as a safeguard and the boxplot is useful for spotting outlier samples.
+
+---
+
 ## Pipeline
 
 RAPID implements an 8-module workflow:
 
 ```
 proteinGroups.txt
-      │
-      ▼
-┌─────────────────┐
-│  1. DOWNLOAD    │  wget from URL (PRIDE, GitHub, etc.)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  2. QC_FILTER   │  Remove contaminants, reverse hits, low-coverage proteins
-└────────┬────────┘
-         │
-    ┌────┴─────┐
-    ▼          ▼
-┌───────┐  ┌──────────┐
-│ 3.    │  │  4. PCA  │  Quality control visualization
-│NORMAL │  └────┬─────┘
-│  IZE  │       │
-└───┬───┘       │
-    │            │
-    ▼            │
-┌──────────┐     │
-│ 5.DA_    │     │
-│ MULTI    │  All pairwise DEqMS comparisons
-└────┬─────┘     │
-     │            │
-     ▼            │
-┌──────────┐      │
-│ 6. ENRI- │      │
-│  CHMENT  │  GO/KEGG pathway enrichment
-└────┬─────┘      │
-     │             │
-     └──────┬──────┘
-            ▼
-     ┌─────────────┐
-     │  7. REPORT  │  Self-contained HTML report
-     └──────┬──────┘
-            │
-            ▼
-     ┌─────────────┐
-     │  8. VALIDATE│  Output integrity checks
-     └─────────────┘
+      |
+      v
++-----------------+
+|  1. DOWNLOAD    |  wget from URL (PRIDE, GitHub, etc.)
++--------+--------+
+         |
+         v
++-----------------+
+|  2. QC_FILTER   |  Remove contaminants, reverse hits, low-coverage proteins
++--------+--------+
+         |
+    +----+---------+
+    v              v
++-------+    +----------+
+| 3.    |    |  4. PCA  |  Quality control visualization
+|NORMAL |    +----+-----+
+|  IZE  |          |
++---+---+          |
+    |              |
+    v              |
++----------+       |
+| 5.DA_    |       |
+| MULTI    |  All pairwise DEqMS comparisons
++----+-----+       |
+     |             |
+     v             |
++----------+       |
+| 6. ENRI- |       |
+|  CHMENT  |  GO/KEGG pathway enrichment
++----+-----+       |
+     |             |
+     +------+------+
+            v
+     +-------------+
+     |  7. REPORT  |  Self-contained HTML report
+     +------+------+
+            |
+            v
+     +-------------+
+     |  8. VALIDATE|  Output integrity checks
+     +-------------+
 ```
 
 ### Modules
@@ -111,7 +135,7 @@ proteinGroups.txt
 | 5 | `DA_MULTI` | `04_da_multi.R` | All pairwise DEqMS differential abundance comparisons; one volcano plot per comparison |
 | 6 | `ENRICHMENT` | `05_enrichment.R` | GO Biological Process and KEGG enrichment via clusterProfiler; organism-aware |
 | 7 | `REPORT` | `06_report.R` | Self-contained HTML report with all figures, tables, and reproducibility info |
-| 8 | `VALIDATE` | `08_validate.R` | Automated output validation -> checks file existence, dimensions, column integrity, p-value ranges, and report structure |
+| 8 | `VALIDATE` | `08_validate.R` | Automated output validation: checks file existence, dimensions, column integrity, p-value ranges, and report structure |
 
 ---
 
@@ -121,47 +145,32 @@ proteinGroups.txt
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| [Nextflow](https://www.nextflow.io/) | ≥ 23.04.0 | Workflow management |
+| [Conda](https://docs.conda.io/) | any | Environment management (includes Nextflow) |
 | [Docker](https://www.docker.com/) | any | Recommended execution environment |
-| [Conda](https://docs.conda.io/) | any | Alternative execution environment |
-| Java | ≥ 11 | Required by Nextflow |
+| Java | >= 11 | Required by Nextflow |
 
-### Step 1: Install Nextflow
+> **Note on Java:** Nextflow requires Java 11 or later. Check with `java -version`. If not installed, the easiest way is `conda install -c conda-forge openjdk=17` after creating the environment below.
 
-```bash
-curl -s https://get.nextflow.io | bash
-sudo mv nextflow /usr/local/bin/
-nextflow -version
-```
-
-### Step 2: Clone the repository
+### Step 1: Clone the repository
 
 ```bash
 git clone https://github.com/ShaunakRaole/RAPID.git
 cd RAPID
 ```
 
-### Step 3: Set up your environment
+### Step 2: Set up the conda environment
 
-**Option A: Docker (recommended)**
-
-Pull the pre-built image:
-
-```bash
-docker pull shaunakraole/rapid:1.0
-```
-
-Or build locally:
-
-```bash
-docker build -t shaunakraole/rapid:1.0 .
-```
-
-**Option B: Conda**
+This installs all dependencies including Nextflow, R, and all required packages:
 
 ```bash
 conda env create -f environment.yml
 conda activate rapid
+```
+
+Verify Nextflow is available:
+
+```bash
+nextflow -version
 ```
 
 > **Note:** `org.Mm.eg.db`, `org.Rn.eg.db`, and `org.Sc.sgd.db` (mouse, rat, yeast annotation packages) must be installed manually after conda env creation due to a known Bioconductor post-install issue on macOS ARM64:
@@ -171,39 +180,75 @@ conda activate rapid
 > ```
 > These packages are pre-installed in the Docker image and are not required if using Docker.
 
+### Step 3 (optional): Pull the Docker image
+
+If you want to run with `-profile docker` (recommended for full reproducibility):
+
+```bash
+docker pull shaunakr/rapid:1.0
+```
+
+Or build locally:
+
+```bash
+docker build -t shaunakr/rapid:1.0 .
+```
+
 ---
 
 ## Quick Start
 
+The examples below use a human cancer proteomics dataset comparing samples of two different conditions. This gives a realistic demo of what RAPID produces on human data.
+
+**Dataset:** 18 human cancer samples, from the statOmics proteomics course repository.
+**Expected result:** ~252 significant proteins at FDR 0.05, log2FC > 1.
+
 ### Run with Docker (recommended)
 
+Docker gives the most reproducible results. All R packages are pinned to exact versions inside the container.
+
 ```bash
-nextflow run main.nf -profile docker \
-    --data_url    "https://raw.githubusercontent.com/statOmics/PDA21/data/quantification/cptacAvsB_lab3/proteinGroups.txt" \
-    --sample_sheet test-data/test_sample_sheet.csv \
-    --condition_a  6A \
-    --condition_b  6B \
-    --organism     human \
-    --outdir       results
+conda activate rapid
+
+nextflow run main.nf \
+    -profile docker \
+    --data_url "https://raw.githubusercontent.com/statOmics/pda/data/quantification/cancer/proteinGroups.txt" \
+    --sample_sheet test-data/cancer_sample_sheet.csv \
+    --condition_a OR \
+    --condition_b PD \
+    --organism human \
+    --outdir cancer_results
 ```
+
+Results will be in `cancer_results/`. The HTML report is at `cancer_results/report/proteomics_report.html`.
 
 ### Run with Conda
 
+If Docker is not available (e.g. on an HPC cluster), use the conda profile instead:
+
 ```bash
-nextflow run main.nf -profile conda \
-    --data_url    "https://your-pride-url/proteinGroups.txt" \
-    --sample_sheet my_sample_sheet.csv \
-    --condition_a  control \
-    --condition_b  treatment \
-    --organism     human \
-    --outdir       results
+conda activate rapid
+
+nextflow run main.nf \
+    -profile conda \
+    --data_url "https://raw.githubusercontent.com/statOmics/pda/data/quantification/cancer/proteinGroups.txt" \
+    --sample_sheet test-data/cancer_sample_sheet.csv \
+    --condition_a OR \
+    --condition_b PD \
+    --organism human \
+    --outdir cancer_results_conda
 ```
 
 ### Run the bundled test profile
 
+The test profile uses the CPTAC benchmark dataset (yeast + human spike-in, 6 samples) and runs in a few seconds. It is pre-configured with all parameters and is useful for verifying the pipeline works on your system before running your own data.
+
 ```bash
+conda activate rapid
 nextflow run main.nf -profile test,docker
 ```
+
+Expected outputs will be in `test_results/`. You should see a small number of significant UPS1 human proteins.
 
 ---
 
@@ -213,9 +258,9 @@ The sample sheet is a plain CSV file describing your experimental design. It mus
 
 | Column | Required | Description |
 |--------|----------|-------------|
-| `sample` | ✅ | Unique sample identifier used in output files |
-| `condition` | ✅ | Experimental condition -> must match `--condition_a` / `--condition_b` |
-| `file_name` | ✅ | Must exactly match the suffix after `LFQ intensity ` in the MaxQuant `proteinGroups.txt` column header |
+| `sample` | Yes | Unique sample identifier used in output files |
+| `condition` | Yes | Experimental condition. Must match `--condition_a` / `--condition_b` |
+| `file_name` | Yes | Must exactly match the suffix after `LFQ intensity ` in the MaxQuant `proteinGroups.txt` column header |
 
 **Example:**
 
@@ -232,7 +277,6 @@ treatment_rep3,treatment,treat_3
 **How to find your `file_name` values:**
 
 ```bash
-# Print all LFQ column names from your proteinGroups.txt
 head -1 proteinGroups.txt | tr '\t' '\n' | grep "LFQ intensity"
 # The file_name is everything after "LFQ intensity "
 ```
@@ -271,8 +315,8 @@ head -1 proteinGroups.txt | tr '\t' '\n' | grep "LFQ intensity"
 
 | Profile | Description | Use case |
 |---------|-------------|----------|
-| `docker` | Uses `shaunakraole/rapid:1.0` container | **Recommended** fully reproducible, works on any system with Docker |
-| `conda` | Uses `environment.yml` conda environment | Local development on Linux/macOS |
+| `docker` | Uses `shaunakr/rapid:1.0` container | Recommended: fully reproducible, works on any system with Docker |
+| `conda` | Uses `environment.yml` conda environment | Local development on Linux/macOS, or HPC clusters without Docker |
 | `test` | Pre-configured test run using CPTAC benchmark data | Verifying installation, CI/CD |
 | `test,docker` | Test profile + Docker | Clean end-to-end validation |
 
@@ -284,38 +328,38 @@ All outputs are written to `--outdir` (default: `results/`):
 
 ```
 results/
-├── raw/
-│   └── proteinGroups.txt              # Downloaded raw MaxQuant output
-│
-├── qc/
-│   ├── filtered_matrix.tsv            # QC-filtered intensity matrix (tab-separated)
-│   ├── qc_summary.txt                 # QC statistics (proteins removed, retained)
-│   ├── normalization_boxplot.png      # Intensity distributions before/after normalization
-│   ├── pca_plot.png                   # PCA of normalized samples coloured by condition
-│   └── pca_coords.tsv                 # PCA coordinates per sample
-│
-├── normalized/
-│   └── normalized_matrix.tsv          # log2 + median-centered intensity matrix
-│
-├── results/
-│   ├── da_results_all_comparisons.tsv # Combined DA results across all pairwise comparisons
-│   ├── da_results_<B>_vs_<A>.tsv      # Per-comparison DA results
-│   └── volcano_<B>_vs_<A>.png         # Volcano plot per comparison
-│
-├── enrichment/
-│   ├── enrichment_results.tsv         # Combined GO and KEGG enrichment results
-│   ├── go_dotplot_<comparison>.png    # GO Biological Process dot plot (if significant)
-│   └── kegg_dotplot_<comparison>.png  # KEGG pathway dot plot (if significant)
-│
-├── report/
-│   └── proteomics_report.html         # Self-contained HTML report (all figures embedded)
-│
-├── validation/
-│   └── validation_report.txt          # Automated output validation results
-│
-├── pipeline_report.html               # Nextflow execution report
-├── timeline.html                      # Process execution timeline
-└── pipeline_dag.html                  # Pipeline DAG visualization
+|-- raw/
+|   `-- proteinGroups.txt              # Downloaded raw MaxQuant output
+|
+|-- qc/
+|   |-- filtered_matrix.tsv            # QC-filtered intensity matrix (tab-separated)
+|   |-- qc_summary.txt                 # QC statistics (proteins removed, retained)
+|   |-- normalization_boxplot.png      # Intensity distributions before/after normalization
+|   |-- pca_plot.png                   # PCA of normalized samples coloured by condition
+|   `-- pca_coords.tsv                 # PCA coordinates per sample
+|
+|-- normalized/
+|   `-- normalized_matrix.tsv          # log2 + median-centered intensity matrix
+|
+|-- results/
+|   |-- da_results_all_comparisons.tsv # Combined DA results across all pairwise comparisons
+|   |-- da_results_<B>_vs_<A>.tsv      # Per-comparison DA results
+|   `-- volcano_<B>_vs_<A>.png         # Volcano plot per comparison
+|
+|-- enrichment/
+|   |-- enrichment_results.tsv         # Combined GO and KEGG enrichment results
+|   |-- go_dotplot_<comparison>.png    # GO Biological Process dot plot (if significant)
+|   `-- kegg_dotplot_<comparison>.png  # KEGG pathway dot plot (if significant)
+|
+|-- report/
+|   `-- proteomics_report.html         # Self-contained HTML report (all figures embedded)
+|
+|-- validation/
+|   `-- validation_report.txt          # Automated output validation results
+|
+|-- pipeline_report.html               # Nextflow execution report
+|-- timeline.html                      # Process execution timeline
+`-- pipeline_dag.html                  # Pipeline DAG visualization
 ```
 
 ### DA Results Columns
@@ -341,37 +385,18 @@ The main output `da_results_all_comparisons.tsv` contains:
 
 RAPID ships with a pre-configured test profile using the CPTAC benchmark dataset (a well-characterised proteomics gold standard used extensively in methods development).
 
-**Dataset:** CPTAC Study 6 -> UPS1 spike-in (48 human proteins) in *S. cerevisiae* background  
-**Source:** [statOmics/PDA21](https://github.com/statOmics/PDA21) - Goeminne et al. (2016)  
-**Conditions:** 6A (0.25 fmol/μL spike-in) vs 6B (0.74 fmol/μL spike-in)  
-**Samples:** 6 total (3 replicates per condition)  
-**Expected runtime:** A few seconds on a laptop  
-**Expected output:** ~2 significant UPS1 human proteins; enrichment sparse (mixed yeast/human background)
+**Dataset:** CPTAC Study 6: UPS1 spike-in (48 human proteins) in *S. cerevisiae* background
+**Source:** [statOmics/PDA21](https://github.com/statOmics/PDA21) - Goeminne et al. (2016)
+**Conditions:** 6A (0.25 fmol/uL spike-in) vs 6B (0.74 fmol/uL spike-in)
+**Samples:** 6 total (3 replicates per condition)
+**Expected runtime:** A few minutes on a laptop
+**Expected output:** A small number of significant UPS1 human proteins; enrichment sparse (mixed yeast/human background)
 
 ```bash
-# Run the test profile
 nextflow run main.nf -profile test,docker
-
-# Expected outputs in test_results/
 ```
 
 **Test sample sheet** is available at `test-data/test_sample_sheet.csv`.
-
----
-
-## Scientific Background
-
-### Why DEqMS instead of limma?
-
-Standard limma assumes equal prior variance across all proteins. In proteomics, proteins quantified by more peptides or PSMs have inherently more reliable intensity estimates. DEqMS (Zhen et al., 2020) explicitly models this relationship, providing better statistical power and accuracy (particularly important for proteins quantified by a single peptide).
-
-### Why median centering normalization?
-
-Median centering is a robust, assumption-free normalization method appropriate for LFQ proteomics data where systematic shifts between samples are expected but large-scale biological differences may exist. It preserves relative differences between samples better than quantile normalization, which can introduce artifacts when conditions have genuinely different proteome compositions.
-
-### Reproducibility
-
-Tool choice in proteomics differential abundance analysis substantially affects results. Peng et al. (2024) showed that different pipelines applied to the same data can produce drastically different lists of significant proteins. RAPID implements the recommended workflow with fully pinned software versions, ensuring that results are reproducible across systems, time, and users.
 
 ---
 
@@ -381,21 +406,21 @@ Tool choice in proteomics differential abundance analysis substantially affects 
 
 | Package | Version | Source | Purpose |
 |---------|---------|--------|---------|
-| `data.table` | ≥1.14 | CRAN | Fast data I/O and manipulation |
-| `ggplot2` | ≥3.4 | CRAN | Visualization |
-| `ggrepel` | ≥0.9 | CRAN | Non-overlapping labels on volcano plots |
-| `rmarkdown` | ≥2.20 | CRAN | HTML report rendering |
-| `knitr` | ≥1.40 | CRAN | Report code execution |
-| `kableExtra` | ≥1.3 | CRAN | HTML table formatting |
-| `bit64` | ≥4.0 | CRAN | 64-bit integer support for large intensity values |
-| `limma` | ≥3.54 | Bioconductor | Linear model framework for DA analysis |
-| `DEqMS` | ≥1.16 | Bioconductor | Peptide-count-aware variance estimation |
-| `clusterProfiler` | ≥4.6 | Bioconductor | GO and KEGG enrichment analysis |
-| `enrichplot` | ≥1.18 | Bioconductor | Enrichment result visualization |
-| `org.Hs.eg.db` | ≥3.16 | Bioconductor | Human gene annotation |
-| `org.Mm.eg.db` | ≥3.16 | Bioconductor | Mouse gene annotation |
-| `org.Rn.eg.db` | ≥3.16 | Bioconductor | Rat gene annotation |
-| `org.Sc.sgd.db` | ≥3.16 | Bioconductor | Yeast gene annotation |
+| `data.table` | >=1.14 | CRAN | Fast data I/O and manipulation |
+| `ggplot2` | >=3.4 | CRAN | Visualization |
+| `ggrepel` | >=0.9 | CRAN | Non-overlapping labels on volcano plots |
+| `rmarkdown` | >=2.20 | CRAN | HTML report rendering |
+| `knitr` | >=1.40 | CRAN | Report code execution |
+| `kableExtra` | >=1.3 | CRAN | HTML table formatting |
+| `bit64` | >=4.0 | CRAN | 64-bit integer support for large intensity values |
+| `limma` | >=3.54 | Bioconductor | Linear model framework for DA analysis |
+| `DEqMS` | >=1.16 | Bioconductor | Peptide-count-aware variance estimation |
+| `clusterProfiler` | >=4.6 | Bioconductor | GO and KEGG enrichment analysis |
+| `enrichplot` | >=1.18 | Bioconductor | Enrichment result visualization |
+| `org.Hs.eg.db` | >=3.16 | Bioconductor | Human gene annotation |
+| `org.Mm.eg.db` | >=3.16 | Bioconductor | Mouse gene annotation |
+| `org.Rn.eg.db` | >=3.16 | Bioconductor | Rat gene annotation |
+| `org.Sc.sgd.db` | >=3.16 | Bioconductor | Yeast gene annotation |
 
 ---
 
@@ -424,31 +449,32 @@ Tool choice in proteomics differential abundance analysis substantially affects 
 
 ```
 RAPID/
-├── .github/
-│   └── workflows/
-│       ├── lint.yml          # R syntax, Nextflow DSL, Dockerfile linting
-│       └── test.yml          # End-to-end pipeline test with output validation
-│
-├── bin/
-│   ├── 01_qc_filter.R        # QC and contaminant filtering
-│   ├── 02_normalize.R        # log2 transformation and median centering
-│   ├── 03_pca.R              # PCA of normalized matrix
-│   ├── 04_da_multi.R         # All pairwise DEqMS differential abundance
-│   ├── 05_enrichment.R       # GO/KEGG pathway enrichment (organism-aware)
-│   ├── 06_report.R           # HTML report generation
-│   └── 08_validate.R         # Output validation
-│
-├── test-data/
-│   └── test_sample_sheet.csv # Sample sheet for CPTAC test dataset
-│
-├── .gitignore
-├── Dockerfile                # Docker image definition (rocker/r-ver:4.3.3 base)
-├── LICENSE
-├── README.md
-├── environment.yml           # Conda environment specification
-├── logo.png                  # RAPID pipeline logo
-├── main.nf                   # Nextflow DSL2 workflow
-└── nextflow.config           # Pipeline configuration and profiles
+|-- .github/
+|   `-- workflows/
+|       |-- lint.yml          # R syntax, Nextflow DSL, Dockerfile linting
+|       `-- test.yml          # End-to-end pipeline test with output validation
+|
+|-- bin/
+|   |-- 01_qc_filter.R        # QC and contaminant filtering
+|   |-- 02_normalize.R        # log2 transformation and median centering
+|   |-- 03_pca.R              # PCA of normalized matrix
+|   |-- 04_da_multi.R         # All pairwise DEqMS differential abundance
+|   |-- 05_enrichment.R       # GO/KEGG pathway enrichment (organism-aware)
+|   |-- 06_report.R           # HTML report generation
+|   `-- 08_validate.R         # Output validation
+|
+|-- test-data/
+|   |-- test_sample_sheet.csv   # Sample sheet for CPTAC test dataset
+|   `-- cancer_sample_sheet.csv # Sample sheet for human cancer demo dataset
+|
+|-- .gitignore
+|-- Dockerfile                # Docker image definition (rocker/r-ver:4.3.3 base)
+|-- LICENSE
+|-- README.md
+|-- environment.yml           # Conda environment specification (includes Nextflow)
+|-- logo.png                  # RAPID pipeline logo
+|-- main.nf                   # Nextflow DSL2 workflow
+`-- nextflow.config           # Pipeline configuration and profiles
 ```
 
 ---
@@ -473,13 +499,13 @@ If you use RAPID in your research, please cite:
 > Raole, S. (2026). RAPID: Reproducible Analysis Pipeline for Intensity-based proteomics Data. Georgia Institute of Technology. https://github.com/ShaunakRaole/RAPID
 
 **DEqMS**
-> Zhen, Y., Aardema, M.L., Medema, E.M., Lodder, E.M., Linke, W.A., de Weger, R.A., & Chamuleau, M.E.D. (2020). DEqMS: A Method for Accurate Variance Estimation in Differential Protein Expression Analysis. *Molecular & Cellular Proteomics*, 19(6), 1047–1057. https://doi.org/10.1074/mcp.TIR119.001646
+> Zhen, Y., Aardema, M.L., Medema, E.M., Lodder, E.M., Linke, W.A., de Weger, R.A., & Chamuleau, M.E.D. (2020). DEqMS: A Method for Accurate Variance Estimation in Differential Protein Expression Analysis. *Molecular & Cellular Proteomics*, 19(6), 1047-1057. https://doi.org/10.1074/mcp.TIR119.001646
 
 **clusterProfiler**
-> Yu, G., Wang, L.G., Han, Y., & He, Q.Y. (2012). clusterProfiler: an R Package for Comparing Biological Themes Among Gene Clusters. *OMICS: A Journal of Integrative Biology*, 16(5), 284–287. https://doi.org/10.4253/omics.20120018
+> Yu, G., Wang, L.G., Han, Y., & He, Q.Y. (2012). clusterProfiler: an R Package for Comparing Biological Themes Among Gene Clusters. *OMICS: A Journal of Integrative Biology*, 16(5), 284-287. https://doi.org/10.4253/omics.20120018
 
 **Nextflow**
-> Di Tommaso, P., Chatzou, M., Floden, E.W., Barja, P.P., Palumbo, E., & Notredame, C. (2017). Nextflow enables reproducible computational workflows. *Nature Biotechnology*, 35(4), 316–319. https://doi.org/10.1038/nbt.3820
+> Di Tommaso, P., Chatzou, M., Floden, E.W., Barja, P.P., Palumbo, E., & Notredame, C. (2017). Nextflow enables reproducible computational workflows. *Nature Biotechnology*, 35(4), 316-319. https://doi.org/10.1038/nbt.3820
 
 **OpDEA benchmarking**
 > Peng, M., Guo, T., & Hermjakob, H. (2024). Optimizing differential expression analysis for proteomics data via high-performing rules and ensemble inference. *Nature Communications*, 15, 3515. https://doi.org/10.1038/s41467-024-47899-w
