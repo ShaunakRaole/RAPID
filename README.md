@@ -217,7 +217,8 @@ nextflow run main.nf \
     --condition_a OR \
     --condition_b PD \
     --organism human \
-    --outdir cancer_results
+    --outdir cancer_results \
+    2>&1 | tee nextflow_run.log
 ```
 
 Results will be in `cancer_results/`. The HTML report is at `cancer_results/report/proteomics_report.html`.
@@ -236,7 +237,8 @@ nextflow run main.nf \
     --condition_a OR \
     --condition_b PD \
     --organism human \
-    --outdir cancer_results_conda
+    --outdir cancer_results_conda \
+    2>&1 | tee nextflow_run.log
 ```
 
 ### Run the bundled test profile
