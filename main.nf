@@ -18,18 +18,6 @@ nextflow.enable.dsl = 2
 //   8. VALIDATE        — output validation and integrity checks
 // ============================================================
 
-log.info """
-=========================================
- R A P I D   P I P E L I N E
-=========================================
-Dataset URL  : ${params.data_url}
-Sample sheet : ${params.sample_sheet}
-Min valid    : ${params.min_valid_values}
-FDR cutoff   : ${params.fdr_cutoff}
-FC cutoff    : ${params.fc_cutoff}
-Output dir   : ${params.outdir}
-=========================================
-""".stripIndent()
 
 // ============================================================
 // PROCESS 1: Download data
@@ -274,6 +262,19 @@ process VALIDATE {
 // WORKFLOW
 // ============================================================
 workflow {
+
+log.info """
+=========================================
+ R A P I D   P I P E L I N E
+=========================================
+Dataset URL  : ${params.data_url}
+Sample sheet : ${params.sample_sheet}
+Min valid    : ${params.min_valid_values}
+FDR cutoff   : ${params.fdr_cutoff}
+FC cutoff    : ${params.fc_cutoff}
+Output dir   : ${params.outdir}
+=========================================
+""".stripIndent()
 
     if (!params.data_url)    error "ERROR: --data_url is required"
     if (!params.sample_sheet) error "ERROR: --sample_sheet is required"
